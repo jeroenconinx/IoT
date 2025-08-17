@@ -1,0 +1,22 @@
+#include "task_communication.h"
+
+QueueHandle_t ball_coordinates_queue; // Definition of the queue
+
+void initializeCommunicationTasks() {
+    // Create a queue to hold ball coordinates messages
+	ball_coordinates_queue = xQueueCreate(1u, sizeof(int[2])); // Adjust queue size and data type as needed
+	ball_status_queue = xQueueCreate(1u, sizeof(int[2])); // Adjust queue size and data type as needed
+    // Check if the queue creation was successful and handle errors if necessary
+}
+
+int pack_coordinate(int x, int y)
+{
+	int packed_coordinates = (x << 8) | y;
+	return packed_coordinates;
+}
+
+void unpack_coordinate(int packed_coordinate, int *x, int *y)
+{
+	*x = (packed_coordinate >> 8) & 0xFF;
+	*y = packed_coordinate & 0xFF;
+}

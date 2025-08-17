@@ -1,0 +1,146 @@
+#include "stdio.h"
+#include "string.h"
+#include "math.h"
+#include "pid_controller.h"
+
+#define SQRT_3_OVER_2 0.8660254037844386467637231707529
+#define RAD_TO_DEG 57.2957786
+
+#define E_LENGTH -12
+#define D_LENGTH 80
+#define R_LENGTH 100
+#define l1 24.949
+#define l2 87.834
+const float l1sq = l1*l1;
+const float l2sq = l2*l2;
+const float A1shoulder[3] = {SQRT_3_OVER_2*D_LENGTH, 0.5*D_LENGTH, 0};
+const float A2shoulder[3] = {-SQRT_3_OVER_2*D_LENGTH, 0.5*D_LENGTH, 0};
+const float A3shoulder[3] = {0, -D_LENGTH, 0};
+const float B1wrist[3] = {SQRT_3_OVER_2*R_LENGTH, 0.5*R_LENGTH, E_LENGTH};
+const float B2wrist[3] = {-SQRT_3_OVER_2*R_LENGTH, 0.5*R_LENGTH, E_LENGTH};
+const float B3wrist[3] = {0, -R_LENGTH, E_LENGTH};
+const float R1arm[3][3] = {{SQRT_3_OVER_2, 0.5, 0}, {-0.5, SQRT_3_OVER_2, 0}, {0, 0, 1}};
+const float R2arm[3][3] = {{-SQRT_3_OVER_2, 0.5, 0}, {-0.5, -SQRT_3_OVER_2, 0}, {0, 0, 1}};
+const float R3arm[3][3] = {{0, -1, 0}, {1, 0, 0}, {0, 0, 1}};
+
+#define MAX_INTEGRATOR_ERROR 1000 //10000
+#define HEIGHT 102
+
+#define kP 0.00016
+#define kI 0.00001
+//#define kI 0
+#define kD 0.001
+//#define kD 0
+
+float x_angle;
+float y_angle;
+
+int pos_error_x = 0;
+int pos_error_y = 0;
+
+int previous_pos_error_x = 0;
+int previous_pos_error_y = 0;
+
+int integrator_error_x = 0;
+int integrator_error_y = 0;
+
+float calcAngle(float x, float z) {
+	const float xsq = x*x;
+	const float zsq = z*z;
+	const float x1 = (l1sq - l2sq + xsq - zsq + (z*(l2sq*z - l1sq*z + xsq*z + x*sqrt((-l1sq + 2*l1*l2 - l2sq + xsq + zsq)*(l1sq + 2*l1*l2 + l2sq - xsq - zsq)) + z*z*z))/(xsq + zsq))/(2*x);
+	const float z1 = z - (l2sq*z - l1sq*z + xsq*z + x*sqrt((-l1sq + 2*l1*l2 - l2sq + xsq + zsq)*(l1sq + 2*l1*l2 + l2sq - xsq - zsq)) + z*z*z)/(2*(xsq + zsq));
+	const float angle = atan(z1/x1);
+	if (!isnan(angle)) return angle;
+	else {
+//		printf("NANANANA\n");
+		return 0;
+	}
+}
+
+void geelen_transform(float x_angle, float y_angle, int height, int *angle_1, int *angle_2, int *angle_3)
+{
+	float P[3];
+	float R[3][3];
+	float B1transformed[3];
+	float B2transformed[3];
+	float B3transformed[3];
+	float S1arm[3];
+	float S2arm[3];
+	float S3arm[3];
+	float S1transformed[3];
+	float S2transformed[3];
+	float S3transformed[3];
+	// rotation matrix
+	  P[2] = height;
+	  R[0][0] = cos(y_angle);
+	  R[0][1] = sin(x_angle)*sin(y_angle);
+	  R[0][2] = cos(x_angle)*sin(y_angle);
+	  R[1][0] = 0;
+	  R[1][1] = cos(x_angle);
+	  R[1][2] = -sin(x_angle);
+	  R[2][0] = -sin(y_angle);
+	  R[2][1] = sin(x_angle)*cos(y_angle);
+	  R[2][2] = cos(x_angle)*cos(y_angle);
+
+	  // calculate B matrices relative to end effector, so multiply R by Bi_wrist... and store in Bi_transformed
+	  // clear last Bitransformed: floats are 4 bytes so array of 3 floats is 12 bytes
+	  memset(B1transformed, 0, 12);
+	  memset(B2transformed, 0, 12);
+	  memset(B3transformed, 0, 12);
+	  for (int i=0; i<3; i++) {
+	    for (int j=0; j<3; j++) {
+	      B1transformed[i] += R[i][j] * B1wrist[j];
+	      B2transformed[i] += R[i][j] * B2wrist[j];
+	      B3transformed[i] += R[i][j] * B3wrist[j];
+	    }
+	  }
+
+	  for (int i=0; i<3; i++) {
+	    S1arm[i] = P[i] + B1transformed[i] - A1shoulder[i];
+	    S2arm[i] = P[i] + B2transformed[i] - A2shoulder[i];
+	    S3arm[i] = P[i] + B3transformed[i] - A3shoulder[i];
+	  }
+
+	  memset(S1transformed, 0, 12);
+	  memset(S2transformed, 0, 12);
+	  memset(S3transformed, 0, 12);
+	  for (int i=0; i<3; i++) {
+	    for (int j=0; j<3; j++) {
+	      S1transformed[i] += R1arm[i][j] * S1arm[j];
+	      S2transformed[i] += R2arm[i][j] * S2arm[j];
+	      S3transformed[i] += R3arm[i][j] * S3arm[j];
+	    }
+	  }
+	  *angle_1 = (int) (calcAngle(S1transformed[0], S1transformed[2])*RAD_TO_DEG);
+	  *angle_2 = (int) (calcAngle(S2transformed[0], S2transformed[2])*RAD_TO_DEG);
+	  *angle_3 = (int) (calcAngle(S3transformed[0], S3transformed[2])*RAD_TO_DEG);
+//	  printf("S1: %d, S2: %d, S3: %d\n", *angle_1, *angle_2, *angle_3);
+}
+
+void pid(int target_x, int target_y, int pos_x, int pos_y, int *angle_1, int *angle_2, int *angle_3)
+{
+//	printf("\natarget_x: %d, target_y: %d\n", target_x, target_y);
+//	printf("pos_x: %d, pos_y: %d\n", pos_x, pos_y);
+	int error_x = target_x - pos_x;
+	int error_y = target_y - pos_y;
+
+	int change_error_x = error_x - previous_pos_error_x;
+	int change_error_y = error_y - previous_pos_error_y;
+
+	integrator_error_x += error_x;
+	integrator_error_y += error_y;
+
+	if (integrator_error_x > MAX_INTEGRATOR_ERROR) { integrator_error_x = MAX_INTEGRATOR_ERROR; }
+	else if (integrator_error_x < -MAX_INTEGRATOR_ERROR) { integrator_error_x = -MAX_INTEGRATOR_ERROR; }
+	if (integrator_error_y > MAX_INTEGRATOR_ERROR) { integrator_error_y = MAX_INTEGRATOR_ERROR; }
+	else if (integrator_error_y < -MAX_INTEGRATOR_ERROR) { integrator_error_y = -MAX_INTEGRATOR_ERROR; }
+
+	float angle_y = kP * error_x + kI * integrator_error_x + kD * change_error_x;
+	float angle_x = kP * error_y + kI * integrator_error_y + kD * change_error_y;
+//	printf("angle_x: %6.4lf, angle_y: %6.4lf\n", angle_x, angle_y);
+	geelen_transform(angle_x, angle_y, HEIGHT, angle_1, angle_2, angle_3);
+}
+
+
+
+

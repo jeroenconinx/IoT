@@ -1,0 +1,14 @@
+
+#include "FreeRTOS.h"
+#include "queue.h"
+
+
+#ifndef SOURCE_CONTROL_TASK_H_
+#define SOURCE_CONTROL_TASK_H_
+
+void control_task(void *pvParameters);
+void send_readings_to_publisher(int xReading, int yReading);
+
+
+
+#endif /* SOURCE_CONTROL_TASK_H_ */

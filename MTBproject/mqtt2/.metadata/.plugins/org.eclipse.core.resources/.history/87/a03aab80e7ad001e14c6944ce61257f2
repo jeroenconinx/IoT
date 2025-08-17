@@ -1,0 +1,70 @@
+#include "pid_controller.h"
+
+#define SQRT_3_OVER_2 0.8660254037844386467637231707529
+
+#define E_LENGTH -12
+#define D_LENGTH 80
+#define R_LENGTH 100
+#define l1 24.949
+#define l2 87.834
+const float l1sq = l1*l1;
+const float l2sq = l2*l2;
+const float A1shoulder[3] = {SQRT_3_OVER_2*D_LENGTH, 0.5*D_LENGTH, 0};
+const float A2shoulder[3] = {-SQRT_3_OVER_2*D_LENGTH, 0.5*D_LENGTH, 0};
+const float A3shoulder[3] = {0, -D_LENGTH, 0};
+const float B1wrist[3] = {SQRT_3_OVER_2*R_LENGTH, 0.5*R_LENGTH, E_LENGTH};
+const float B2wrist[3] = {-SQRT_3_OVER_2*R_LENGTH, 0.5*R_LENGTH, E_LENGTH};
+const float B3wrist[3] = {0, -R_LENGTH, E_LENGTH};
+const float R1arm[3][3] = {{SQRT_3_OVER_2, 0.5, 0}, {-0.5, SQRT_3_OVER_2, 0}, {0, 0, 1}};
+const float R2arm[3][3] = {{-SQRT_3_OVER_2, 0.5, 0}, {-0.5, -SQRT_3_OVER_2, 0}, {0, 0, 1}};
+const float R3arm[3][3] = {{0, -1, 0}, {1, 0, 0}, {0, 0, 1}};
+
+#define MAX_INTEGRATOR_ERROR 1000 //10000
+#define HEIGHT 102
+
+#define kP 0.00016
+#define kI 0.00001
+#define kD 0.0015
+
+float x_angle;
+float y_angle;
+
+int pos_error_x = 0;
+int pos_error_y = 0;
+
+int previous_pos_error_x = 0;
+int previous_pos_error_y = 0;
+
+int integrator_error_x = 0;
+int integrator_error_y = 0;
+
+void geelen_transform(float x_angle, float y_angle, int height, int *angle_1, int *angle_2, int *angle_3)
+{
+
+}
+
+void pid(int target_x, int target_y, int pos_x, int pos_y, int *angle_1, int *angle_2, int *angle_3)
+{
+	int error_x = target_x - pos_x;
+	int error_y = target_y - pos_y;
+
+	int change_error_x = error_x - previous_pos_error_x;
+	int change_error_y = error_y - previous_pos_error_y;
+
+	integrator_error_x += error_x;
+	integrator_error_y += error_y;
+
+	if (integrator_error_x > MAX_INTEGRATOR_ERROR) { integrator_error_x = MAX_INTEGRATOR_ERROR; }
+	else if (integrator_error_x < -MAX_INTEGRATOR_ERROR) { integrator_error_x = -MAX_INTEGRATOR_ERROR; }
+	if (integrator_error_y > MAX_INTEGRATOR_ERROR) { integrator_error_y = MAX_INTEGRATOR_ERROR; }
+	else if (integrator_error_y < -MAX_INTEGRATOR_ERROR) { integrator_error_y = -MAX_INTEGRATOR_ERROR; }
+
+	float angle_x = kP * error_x + kI * integrator_error_x + kD * change_error_x;
+	float angle_y = kP * error_y + kI * integrator_error_y + kD * change_error_y;
+	geelen_transform(angle_x, angle_y, HEIGHT, *angle_1, *angle_2, *angle_3);
+
+}
+
+
+
+

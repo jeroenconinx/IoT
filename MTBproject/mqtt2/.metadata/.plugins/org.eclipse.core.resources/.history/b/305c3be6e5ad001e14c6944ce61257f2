@@ -1,0 +1,14 @@
+
+
+#ifndef SOURCE_PID_CONTROLLER_H_
+#define SOURCE_PID_CONTROLLER_H_
+
+
+
+void pid(int target_x, int target_y, int pos_x, int pos_y, float *angle_1, float *angle_2, float *angle_3);
+
+void geelen_transform(float x_angle, float y_angle, int height, int *angle_1, int *angle_2, int *angle_3);
+
+
+
+#endif /* SOURCE_PID_CONTROLLER_H_ */

@@ -1,0 +1,20 @@
+
+
+#ifndef SOURCE_TASK_COMMUNICATION_H_
+#define SOURCE_TASK_COMMUNICATION_H_
+
+
+#include "FreeRTOS.h"
+#include "queue.h"
+
+extern QueueHandle_t ball_coordinates_queue;
+extern QueueHandle_t ball_status_queue;
+extern QueueHandle_t servo_angle_queue;
+
+extern int target_coordinate;
+
+void initializeCommunicationTasks();
+int pack_coordinates(int x, int y);
+void unpack_coordinate(int packed_coordinate, int *x, int *y);
+
+#endif /* SOURCE_TASK_COMMUNICATION_H_ */

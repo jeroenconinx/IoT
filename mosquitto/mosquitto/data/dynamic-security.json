@@ -1,0 +1,153 @@
+{
+	"defaultACLAccess":	{
+		"publishClientSend":	false,
+		"publishClientReceive":	true,
+		"subscribe":	false,
+		"unsubscribe":	true
+	},
+	"clients":	[{
+			"username":	"cedalo",
+			"textname":	"Admin user",
+			"roles":	[{
+					"rolename":	"dynsec-admin"
+				}, {
+					"rolename":	"sys-observe"
+				}, {
+					"rolename":	"topic-observe"
+				}],
+			"password":	"O9Tt+HqxkeGuKaGG1cGJsT/QQp24WdbJoER5Je6KGIlguBBjQJRYAfixzXmS9dAc3JSpatKoxZJQmcN6Or5mZg==",
+			"salt":	"8KWgXqyDmM0jiqFY",
+			"iterations":	101
+		}, {
+			"username":	"psoc",
+			"textname":	"blablabla",
+			"textdescription":	"bliblibli",
+			"roles":	[{
+					"rolename":	"client"
+				}, {
+					"rolename":	"sys-observe"
+				}, {
+					"rolename":	"topic-observe"
+				}],
+			"password":	"67YtfY0TnygRdI6Z+KNVbnO61eauK+w73Kx+DvkwQ32OaKL7mb+Idd36Ac13+3lJkSulig8Efk9yoYmqjqmCxA==",
+			"salt":	"drSxVn7lq7D0psyH",
+			"iterations":	101
+		}, {
+			"username":	"streamsheets",
+			"textname":	"Streamsheets User",
+			"roles":	[{
+					"rolename":	"client"
+				}, {
+					"rolename":	"sys-observe"
+				}, {
+					"rolename":	"topic-observe"
+				}],
+			"password":	"6HbyYhcMgIVzzVB2GQx9dSPDvyRhEXch1K+cnADpe++34YcSBqP/Yf+bqWIbOcsDbiNe5Q0WgK7wNsIRjkwbmA==",
+			"salt":	"JTwsfGRlIyM6sUO9",
+			"iterations":	101
+		}, {
+			"username":	"web",
+			"textname":	"webserver",
+			"textdescription":	"node js web server as a dashboard",
+			"roles":	[{
+					"rolename":	"client"
+				}, {
+					"rolename":	"sys-observe"
+				}, {
+					"rolename":	"topic-observe"
+				}],
+			"password":	"HmqlPZnAJn6HVi0aG5z9xSA3qFQiIfn0O3h5P1pFnHKDPxgWsm7mRo94qSHFRfoT4qL+fdF9jYhjziY1Gbpoag==",
+			"salt":	"0skteRUYXpma90Zm",
+			"iterations":	101
+		}],
+	"groups":	[],
+	"roles":	[{
+			"rolename":	"client",
+			"textdescription":	"Read/write access to the full application topic hierarchy.",
+			"acls":	[{
+					"acltype":	"publishClientSend",
+					"topic":	"#",
+					"priority":	0,
+					"allow":	true
+				}, {
+					"acltype":	"publishClientReceive",
+					"topic":	"#",
+					"priority":	0,
+					"allow":	true
+				}, {
+					"acltype":	"subscribePattern",
+					"topic":	"#",
+					"priority":	0,
+					"allow":	true
+				}, {
+					"acltype":	"unsubscribePattern",
+					"topic":	"#",
+					"priority":	0,
+					"allow":	true
+				}]
+		}, {
+			"rolename":	"dynsec-admin",
+			"textname":	"",
+			"textdescription":	"Grants access to administer clients/groups/roles.",
+			"acls":	[{
+					"acltype":	"publishClientSend",
+					"topic":	"$CONTROL/dynamic-security/#",
+					"priority":	0,
+					"allow":	true
+				}, {
+					"acltype":	"publishClientReceive",
+					"topic":	"$CONTROL/dynamic-security/#",
+					"priority":	0,
+					"allow":	true
+				}, {
+					"acltype":	"subscribePattern",
+					"topic":	"$CONTROL/dynamic-security/#",
+					"priority":	0,
+					"allow":	true
+				}]
+		}, {
+			"rolename":	"sys-notify",
+			"textname":	"",
+			"textdescription":	"Allow bridges to publish connection state messages.",
+			"acls":	[{
+					"acltype":	"publishClientSend",
+					"topic":	"$SYS/broker/connection/+/state",
+					"priority":	0,
+					"allow":	true
+				}]
+		}, {
+			"rolename":	"sys-observe",
+			"textname":	"",
+			"textdescription":	"Observe the $SYS topic hierarchy.",
+			"acls":	[{
+					"acltype":	"publishClientReceive",
+					"topic":	"$SYS/#",
+					"priority":	0,
+					"allow":	true
+				}, {
+					"acltype":	"subscribePattern",
+					"topic":	"$SYS/#",
+					"priority":	0,
+					"allow":	true
+				}]
+		}, {
+			"rolename":	"topic-observe",
+			"textdescription":	"Read only access to the full application topic hierarchy.",
+			"acls":	[{
+					"acltype":	"publishClientReceive",
+					"topic":	"#",
+					"priority":	0,
+					"allow":	true
+				}, {
+					"acltype":	"subscribePattern",
+					"topic":	"#",
+					"priority":	0,
+					"allow":	true
+				}, {
+					"acltype":	"unsubscribePattern",
+					"topic":	"#",
+					"priority":	0,
+					"allow":	true
+				}]
+		}]
+}

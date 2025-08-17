@@ -1,0 +1,18 @@
+/*
+ * control_task.h
+ *
+ *  Created on: 07 Jan 2024
+ *      Author: JoaPC
+ */
+
+#ifndef SOURCE_CONTROL_TASK_H_
+#define SOURCE_CONTROL_TASK_H_
+
+#include "FreeRTOS.h"
+#include "queue.h"
+
+
+
+
+
+#endif /* SOURCE_CONTROL_TASK_H_ */

@@ -1,0 +1,18 @@
+/*
+ * servo_task.h
+ *
+ *  Created on: 07 Jan 2024
+ *      Author: JoaPC
+ */
+
+#ifndef SOURCE_SERVO_TASK_H_
+#define SOURCE_SERVO_TASK_H_
+
+#include "FreeRTOS.h"
+#include "queue.h"
+
+extern QueueHandle_t servo_angle_queue;
+
+
+
+#endif /* SOURCE_SERVO_TASK_H_ */

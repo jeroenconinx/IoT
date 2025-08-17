@@ -1,0 +1,24 @@
+#include "task_communication.h"
+
+QueueHandle_t ball_coordinates_queue; // Definition of the queue
+//QueueHandle_t servo_angles_q;
+
+
+//	ball_coordinates_queue = xQueueCreate(1u, sizeof(int[2]));
+//	ball_status_queue = xQueueCreate(1u, sizeof(int[2]));
+//servo_angles_q = xQueueCreate(1u, sizeof(servo_angles_q_data_t));
+
+int target_x = 122;
+int target_y = 92;
+
+int pack_coordinates(int x, int y)
+{
+	int packed_coordinates = (x << 8) | y;
+	return packed_coordinates;
+}
+
+void unpack_coordinate(int packed_coordinate, int *x, int *y)
+{
+	*x = (packed_coordinate >> 8) & 0xFF;
+	*y = packed_coordinate & 0xFF;
+}

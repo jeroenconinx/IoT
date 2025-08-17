@@ -1,0 +1,273 @@
+#include "FreeRTOS.h"
+#include "queue.h"
+
+#include "cy_retarget_io.h"
+
+#include "cy_pdl.h"
+#include "cyhal.h"
+#include "cybsp.h"
+#include "cyhal_adc.h"
+
+#include "math.h"
+#include "task_communication.h"
+#include "publisher_task.h"
+#include "servo_task.h"
+#include "pid_controller.h"
+
+#define min(a, b) ((a) < (b) ? (a) : (b))
+
+#define XMIN 240000
+#define XMAX 3150000
+#define YMAX 380000
+#define YMIN 3150000
+
+
+#define SCREEN_WIDTH 2450
+#define SCREEN_HEIGHT 1850
+
+#define BUFFER_SIZE 9
+
+typedef struct {
+	int readings[9];
+	uint8_t head;
+	uint8_t count;
+} buffer_t;
+
+
+
+
+//globals
+cy_rslt_t rslt;
+cyhal_adc_t adc_obj;
+cyhal_adc_channel_t adc_chan_0_obj;
+cyhal_adc_channel_t adc_chan_1_obj;
+int32_t adc_out_0;
+int32_t adc_out_1;
+const cyhal_adc_channel_config_t channel_config = { .enable_averaging = false, .min_acquisition_ns = 220, .enabled = true };
+
+
+
+int average_of_buffer(buffer_t *buffer)
+{
+	int sum = 0;
+	uint8_t current_size = min(BUFFER_SIZE, buffer->count);
+	for (uint8_t i=0; i < current_size; i++)
+	{
+		sum += buffer->readings[i];
+	}
+	return (int) (sum / BUFFER_SIZE);
+}
+
+void init_buffer(buffer_t *buffer)
+{
+	buffer->head = 0;
+	buffer->count = 0;
+}
+
+
+void add_to_buffer(buffer_t *buffer, int new_reading)
+{
+	buffer->readings[buffer->head] = new_reading;
+	buffer->head = (buffer->head + 1) % BUFFER_SIZE;
+	if (buffer->count < 9) {
+		buffer->count++;
+	}
+}
+
+
+// Publish the readings to the mqtt broker
+void send_readings_to_publisher(int xReading, int yReading)
+{
+	uint32_t packed_coordinate = pack_coordinates(xReading, yReading);
+	printf("packed: %d \n", packed_coordinate);
+
+	publisher_data_t publisher_q_data;
+	publisher_q_data.cmd = PUBLISH_MQTT_MSG;
+	publisher_q_data.data = packed_coordinate;
+	xQueueSend(publisher_task_q, &publisher_q_data, portMAX_DELAY);
+}
+
+
+// init the ADC and GPIO pins
+void pin_init()
+{
+    rslt = cyhal_adc_init(&adc_obj, P10_0, NULL);
+
+	const cyhal_adc_config_t ADCconfig ={
+		.continuous_scanning = false,
+		.resolution = 12,
+		.average_count = 1,
+		.average_mode_flags = 0,
+		.ext_vref_mv = 0,
+		.vneg = CYHAL_ADC_VNEG_VREF,
+		.vref = CYHAL_ADC_REF_VDDA,
+		.ext_vref = NC,
+		.is_bypassed = false,
+		.bypass_pin = NC
+	};
+
+	// Configure to use VDD as Vref
+	rslt = cyhal_adc_configure(&adc_obj, &ADCconfig);
+
+    rslt = cyhal_adc_channel_init_diff(&adc_chan_0_obj, &adc_obj, P10_0, CYHAL_ADC_VNEG, &channel_config);
+    rslt = cyhal_adc_channel_init_diff(&adc_chan_1_obj, &adc_obj, P10_2, CYHAL_ADC_VNEG, &channel_config);
+
+    // GPIO
+    rslt = cyhal_gpio_init(P9_1, CYHAL_GPIO_DIR_INPUT, CYHAL_GPIO_DRIVE_ANALOG, false);
+    rslt = cyhal_gpio_init(P9_3, CYHAL_GPIO_DIR_OUTPUT, CYHAL_GPIO_DRIVE_STRONG, true);
+    cyhal_gpio_write(P9_3, true);
+    rslt = cyhal_gpio_init(P9_5, CYHAL_GPIO_DIR_OUTPUT, CYHAL_GPIO_DRIVE_STRONG, false);
+    cyhal_gpio_write(P9_5, false);
+
+    rslt = cyhal_gpio_init(P9_0, CYHAL_GPIO_DIR_INPUT, CYHAL_GPIO_DRIVE_ANALOG, false);
+    rslt = cyhal_gpio_init(P9_2, CYHAL_GPIO_DIR_INPUT, CYHAL_GPIO_DRIVE_ANALOG, false);
+    rslt = cyhal_gpio_init(P9_4, CYHAL_GPIO_DIR_INPUT, CYHAL_GPIO_DRIVE_ANALOG, false);
+}
+
+
+int read_x()
+{
+	// read adc
+	return cyhal_adc_read_uv(&adc_chan_0_obj);
+}
+void reset_after_x()
+{
+	// reconfigure other pins
+	rslt = cyhal_gpio_configure(P9_1, CYHAL_GPIO_DIR_INPUT, CYHAL_GPIO_DRIVE_ANALOG);
+	rslt = cyhal_gpio_configure(P9_3, CYHAL_GPIO_DIR_INPUT, CYHAL_GPIO_DRIVE_ANALOG);
+	rslt = cyhal_gpio_configure(P9_5, CYHAL_GPIO_DIR_INPUT, CYHAL_GPIO_DRIVE_ANALOG);
+	// reconfigure relevant pins
+	rslt = cyhal_gpio_configure(P9_4, CYHAL_GPIO_DIR_INPUT, CYHAL_GPIO_DRIVE_ANALOG);
+	rslt = cyhal_gpio_configure(P9_2, CYHAL_GPIO_DIR_OUTPUT, CYHAL_GPIO_DRIVE_STRONG);
+	rslt = cyhal_gpio_configure(P9_0, CYHAL_GPIO_DIR_OUTPUT, CYHAL_GPIO_DRIVE_STRONG);
+	// set pins to vcc and gnd
+	cyhal_gpio_write(P9_0, true);
+	cyhal_gpio_write(P9_2, false);
+}
+
+
+int read_y()
+{
+	// read adc
+	return cyhal_adc_read_uv(&adc_chan_1_obj);
+}
+void reset_after_y()
+{
+	// reconfigure other pins
+	rslt = cyhal_gpio_configure(P9_0, CYHAL_GPIO_DIR_INPUT, CYHAL_GPIO_DRIVE_ANALOG);
+	rslt = cyhal_gpio_configure(P9_2, CYHAL_GPIO_DIR_INPUT, CYHAL_GPIO_DRIVE_ANALOG);
+	rslt = cyhal_gpio_configure(P9_4, CYHAL_GPIO_DIR_INPUT, CYHAL_GPIO_DRIVE_ANALOG);
+	// reconfigure relevant pins
+	rslt = cyhal_gpio_configure(P9_1, CYHAL_GPIO_DIR_INPUT, CYHAL_GPIO_DRIVE_ANALOG);
+	rslt = cyhal_gpio_configure(P9_3, CYHAL_GPIO_DIR_OUTPUT, CYHAL_GPIO_DRIVE_STRONG);
+	rslt = cyhal_gpio_configure(P9_5, CYHAL_GPIO_DIR_OUTPUT, CYHAL_GPIO_DRIVE_STRONG);
+	// set pins to vcc and gnd
+	cyhal_gpio_write(P9_3, true);
+	cyhal_gpio_write(P9_5, false);
+}
+
+
+int convert_uv_to_pos_x(int uv_reading)
+{
+	int x_pos = (uv_reading - XMIN) * (SCREEN_WIDTH) / (XMAX - XMIN);
+	return (int)x_pos;
+}
+int convert_uv_to_pos_y(int uv_reading)
+{
+	int y_pos = (uv_reading - YMIN) * (SCREEN_HEIGHT) / (YMAX - YMIN);
+	return (int)y_pos;
+}
+
+
+void control_task(void *pvParameters)
+{
+	pin_init();
+
+	int servo_count = 0;
+	int publish_count = 0;
+	int measure_count = 0;
+
+	buffer_t buffer_x;
+	buffer_t buffer_y;
+	init_buffer(&buffer_x);
+	init_buffer(&buffer_y);
+
+	int pos_x = 0;
+	int pos_y = 0;
+
+	int angle_1;
+	int angle_2;
+	int angle_3;
+
+
+	printf("SETUP DONE\n");
+	while (true)
+	{
+		if (measure_count == 0)
+		{
+			measure_count = 1;
+			adc_out_0 = read_x();
+			// convert reading form microvolts to int and store in circular buffer
+			reset_after_x();
+
+			add_to_buffer(&buffer_x, convert_uv_to_pos_x(adc_out_0));
+
+		}
+		else if (measure_count == 1)
+		{
+			measure_count = 0;
+			adc_out_1 = read_y();
+			reset_after_y();
+
+			add_to_buffer(&buffer_y, convert_uv_to_pos_y(adc_out_1));
+		}
+
+		if (servo_count >= 50)
+		{
+			servo_count = 0;
+			pos_x = average_of_buffer(&buffer_x);
+			pos_y = average_of_buffer(&buffer_y);
+//			printf("READING X: %d", pos_x);
+//			printf("  READING Y: %d \n", pos_y);
+
+			if (pos_x < 0 || pos_y < 0)
+			{
+				angle_1 = 0;
+				angle_2 = 0;
+				angle_3 = 0;
+			}
+			else
+			{
+				pid(target_x, target_y, pos_x, pos_y, &angle_1, &angle_2, &angle_3);
+			}
+//			printf("S1: %d, S2: %d, S3: %d\n", angle_1, angle_2, angle_3);
+
+			servo_angles_q_data_t servo_angles_q_data;
+			servo_angles_q_data.angle1 = angle_1;
+			servo_angles_q_data.angle2 = angle_2;
+			servo_angles_q_data.angle3 = angle_3;
+			xQueueSend(servo_angles_q, &servo_angles_q_data, portMAX_DELAY);
+		}
+
+		if (publish_count >= 1000)
+		{
+			publish_count = 0;
+//			printf("target: %d, %d\n", target_x, target_y);
+			if (publisher_task_q != 0)
+			{
+				// only publish in bounds ball positions
+				if ((pos_x >= 0 && pos_x <= SCREEN_WIDTH) && (pos_y >= 0 && pos_y <= SCREEN_HEIGHT))
+				{
+					send_readings_to_publisher(pos_x, pos_y);
+				}
+			}
+		}
+		servo_count++;
+		publish_count++;
+		vTaskDelay(pdMS_TO_TICKS(1));
+	}
+}
+
+
+
+

@@ -1,0 +1,63 @@
+#include "servo_task.h"
+#include "task_communication.h"
+#include "cyhal.h"
+
+#define SERVO_MAXIMUM_ROTATION_DEGREES 90
+#define SERVO_TIME_RANGE 1000
+
+#define MIDLE_PULSE_WIDTH 1500
+#define MAX_PULSE_WIDTH_CLAMP 1850
+#define MIN_PULSE_WIDTH_CLAMP 1000
+#define PULSE_PERIOD 20000
+
+QueueHandle_t servo_angles_q;
+
+
+void servoRotate(cyhal_pwm_t *pwm_obj, int degree)
+{
+	float pulseWidthPerDegree = ((float)SERVO_TIME_RANGE/(float)SERVO_MAXIMUM_ROTATION_DEGREES);
+	int pulseWidth = MIDLE_PULSE_WIDTH - (int)(degree * pulseWidthPerDegree);
+	if (pulseWidth > MAX_PULSE_WIDTH_CLAMP)
+	{
+		pulseWidth = MAX_PULSE_WIDTH_CLAMP;
+	}
+	if (pulseWidth < MIN_PULSE_WIDTH_CLAMP)
+	{
+		pulseWidth = MIN_PULSE_WIDTH_CLAMP;
+	}
+	cyhal_pwm_set_period(pwm_obj, 20000, pulseWidth);
+//	cyhal_pwm_start(pwm_obj);
+}
+
+void servo_task(void *pvParameters)
+{
+	// servo objects
+	cyhal_pwm_t my_pwm_obj1;
+	cyhal_pwm_init(&my_pwm_obj1, P6_2, NULL);
+	cyhal_pwm_set_period(&my_pwm_obj1, 20000, 1500);
+	cyhal_pwm_start(&my_pwm_obj1);
+
+	cyhal_pwm_t my_pwm_obj2;
+	cyhal_pwm_init(&my_pwm_obj2, P6_3, NULL);
+	cyhal_pwm_set_period(&my_pwm_obj2, 20000, 1500);
+	cyhal_pwm_start(&my_pwm_obj2);
+
+	cyhal_pwm_t my_pwm_obj3;
+	cyhal_pwm_init(&my_pwm_obj3, P6_5, NULL);
+	cyhal_pwm_set_period(&my_pwm_obj3, 20000, 1500);
+	cyhal_pwm_start(&my_pwm_obj3);
+
+	// queue for angles
+	servo_angles_q_data_t servo_angles_q_data;
+	servo_angles_q = xQueueCreate(1u, sizeof(servo_angles_q_data_t));
+
+	while (true)
+	{
+		if (pdTRUE == xQueueReceive(servo_angles_q, &servo_angles_q_data, portMAX_DELAY))
+		{
+			servoRotate(&my_pwm_obj1, servo_angles_q_data.angle1);
+			servoRotate(&my_pwm_obj2, servo_angles_q_data.angle2);
+			servoRotate(&my_pwm_obj3, servo_angles_q_data.angle3);
+		}
+	}
+}

@@ -1,0 +1,27 @@
+
+
+#ifndef SOURCE_TASK_COMMUNICATION_H_
+#define SOURCE_TASK_COMMUNICATION_H_
+
+
+#include "FreeRTOS.h"
+#include "queue.h"
+
+
+extern QueueHandle_t servo_angle_queue;
+
+typedef struct{
+    publisher_cmd_t cmd;
+    char *data;
+//    int data;
+} publisher_data_t;
+
+extern int target_coordinate;
+
+
+void init_queues();
+int pack_coordinates(int x, int y);
+void unpack_coordinate(int packed_coordinate, int *x, int *y);
+
+
+#endif /* SOURCE_TASK_COMMUNICATION_H_ */

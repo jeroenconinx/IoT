@@ -1,0 +1,15 @@
+#include "servo_task.h"
+#include "task_communication.h"
+
+#define SERVO_MAXIMUM_ROTATION_DEGREES 90
+#define SERVO_TIME_RANGE 1000
+
+#define MIDLE_PULSE_WIDTH 1500
+#define MAX_PULSE_WIDTH_CLAMP 1850
+#define MIN_PULSE_WIDTH_CLAMP 1000
+#define PULSE_PERIOD 20000
+
+void servo_task(void *pvParameters)
+{
+
+}
